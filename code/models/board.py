@@ -1,3 +1,7 @@
+"""
+This modules defines the Board class, which represents a Killer Sudoku board.
+"""
+
 from models.cage import Cage
 from models.cell import Cell
 import random
@@ -5,6 +9,9 @@ import requests
 
 
 class Board:
+    """
+    Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
+    """
     MAX_LEN = 81
     MAX_PUZZLE_ROWS = 960 # As per HuggingFace dataset info.
     PUZZLE_URI = "https://datasets-server.huggingface.co/rows?dataset=jackcai1206%2Fkiller-sudoku-puzzles&config=default&split=train"
@@ -57,13 +64,30 @@ class Board:
         self.cells = [[None for _ in range(9)] for _ in range(9)]
         self.cages = {}
 
-    def add_cage(self, cage: Cage):
+    def add_cage(self, cage: Cage) -> None:
+        """
+        Add a cage to the board.
+
+        Arguments:
+            cage -- The cage to add to the board.
+        """
         self.cages[cage.cage_id] = cage
 
-    def get_cage_by_id(self, cage_id: str) -> Cage:
-        return self.cages[cage_id]
+    def get_cage_by_id(self, cage_id: str) -> Cage | None:
+        """
+        Get a cage by its ID.
+        Arguments:
+            cage_id -- The ID of the cage to retrieve.
+
+        Returns:
+            The cage with the specified ID, or None if no such cage exists.
+        """
+        return self.cages.get(cage_id)
 
     def reload_cells(self):
+        """
+        References cells from cages into the main board structure.
+        """
         for cage in self.cages.values():
             for cell in cage.cells:
                 self.cells[cell.row][cell.col] = cell
@@ -72,7 +96,8 @@ class Board:
         result = f"Board(difficulty={self.difficulty})\n"
         result += "Cages:\n"
         for cage_id, cage in self.cages.items():
-            result += f"  Cage {cage_id}: target_sum={cage.target_sum}, cells={[(cell.row, cell.col) for cell in cage.cells]}\n"
+            result += f"  Cage {cage_id}: target_sum={cage.target_sum}, \
+                cells={[(cell.row, cell.col) for cell in cage.cells]}\n"
         result += "Cells:\n"
         for row in self.cells:
             for cell in row:
