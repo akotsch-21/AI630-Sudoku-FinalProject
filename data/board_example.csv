@@ -1,0 +1,3 @@
+"puzzle_id","difficulty","puzzle_string","num_cages","backtrack_calls","solution_count","first_solution"
+0,2,"AAABHHCCDEEAAHHCFGLLHHHIJKNVLLLHMNNNVOPQRMSTUVVWQQXYYUVZ[\\\]UU^_`\\\aUbcddeffggg
+A:35;B:6;C:16;D:1;E:4;F:8;G:4;H:39;I:9;J:3;K:7;L:16;M:9;N:19;O:2;P:9;Q:14;R:4;S:5;T:6;U:27;V:26;W:7;X:6;Y:4;Z:9;[:4;\:30;]:7;^:8;_:5;`:3;a:6;b:2;c:7;d:3;e:4;f:11;g:20",39,64449,1,"[[9,7,8,6,3,4,2,5,1],[1,3,6,5,7,2,9,8,4],[2,4,5,1,8,9,3,7,6],[5,6,1,3,9,8,4,2,7],[3,2,9,7,4,1,5,6,8],[4,8,7,2,5,6,1,3,9],[6,9,4,8,2,3,7,1,5],[8,5,3,9,1,7,6,4,2],[7,1,2,4,6,5,8,9,3]]"
