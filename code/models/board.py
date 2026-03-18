@@ -19,10 +19,7 @@ class Board:
         random_row = random.randint(0, len(puzzle_strings) - 1)
         puzzle_string = puzzle_strings[random_row]
         difficulty = difficulties[random_row]
-        print(f"puzzle_string: {puzzle_string}")
         layout, sums_part = puzzle_string.split("\n", 1)
-        print(f"layout: {layout}")
-        print(f"sums_part: {sums_part}")
 
         if len(layout) != cls.MAX_LEN:
             raise ValueError(f"Invalid puzzle string: {puzzle_string}")
