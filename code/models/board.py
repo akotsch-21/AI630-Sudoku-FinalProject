@@ -4,8 +4,8 @@ This modules defines the Board class, which represents a Killer Sudoku board.
 
 from models.cage import Cage
 from models.cell import Cell
-import random
-import requests
+from typing import Literal
+import duckdb
 
 
 class Board:
@@ -13,26 +13,35 @@ class Board:
     Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
     """
     MAX_LEN = 81
-    MAX_PUZZLE_ROWS = 960 # As per HuggingFace dataset info.
-    PUZZLE_URI = "https://datasets-server.huggingface.co/rows?dataset=jackcai1206%2Fkiller-sudoku-puzzles&config=default&split=train"
+
+    # Get the parquet file path with:
+    # curl -X GET \
+    #  "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train"
+    PUZZLE_PARQUET = "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train/0.parquet"
 
     @classmethod
-    def load_random_puzzle(cls) -> "Board":
+    def load_random_puzzle(cls, difficulty: Literal[2, 3, 4] | None = None) -> "Board":
         """
         Load a random puzzle from the parquet file and construct the sudoku Board object.
+
+        Arguments:
+            difficulty -- The difficulty level of the puzzle to load (2, 3, or 4).
+                          If None, a random difficulty will be selected.
 
         Returns:
             Board: A Board object representing the loaded puzzle.
         """
 
-        # Download a random row from hugging face.
-        random_row = random.randint(0, cls.MAX_PUZZLE_ROWS - 1)
-        response = requests.get(url = cls.PUZZLE_URI + f"&offset={random_row}&length=1", timeout=10)
-        data = response.json()
-        row = data["rows"][0]["row"]
-        puzzle_string = row["puzzle_string"]
-        difficulty = row["difficulty"] # We're always just pulling one row, so take first.
+        # Download a random row from hugging face using DuckDB's parquet reader.
+        query = f"""
+            SELECT puzzle_string, difficulty
+            FROM "{cls.PUZZLE_PARQUET}"
+            {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
+            ORDER BY RANDOM()
+            LIMIT 1
+        """
 
+        puzzle_string, difficulty = duckdb.query(query).fetchone()
         layout, sums_part = puzzle_string.split("\n", 1)
 
         if len(layout) != cls.MAX_LEN:
@@ -59,7 +68,7 @@ class Board:
         board.reload_cells()
         return board
 
-    def __init__(self, difficulty: str):
+    def __init__(self, difficulty: Literal[2, 3, 4]):
         self.difficulty = difficulty
         self.cells = [[None for _ in range(9)] for _ in range(9)]
         self.cages = {}
