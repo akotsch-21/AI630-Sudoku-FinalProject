@@ -107,3 +107,40 @@ class Board:
                     result += f"{cell.value} "
             result += "\n"
         return result
+    
+    def is_valid(self,cell):
+        """
+        check if board is in a valid state after input of cell
+        """
+        row = cell.row
+        col = cell.col
+        val = cell.value
+
+        box = ((row//3)*3, (col//3)*3)
+
+        #* check row and collumn for repeat values 
+        for i in range(9):
+            if self.cells[row][i].value == val and col != i:
+                print("column")
+                return False
+            if self.cells[i][col].value == val and row != i:
+                print("row")
+                return False
+        
+        #* check box 
+        for i in range(box[0],box[0]+3):
+            for j in range(box[1], box[1]+3):
+                if self.cells[i][j].value == val and row != i and col != j:
+                    print("box")
+                    return False
+        
+
+        #* check cages
+        for cage in self.cages.values():
+            if cage.in_cage(cell):
+                print("cage")
+                return cage.is_valid()
+        
+        return True
+        
+        
