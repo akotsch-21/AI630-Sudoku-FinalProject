@@ -41,6 +41,7 @@ class Cage:
 
     def is_valid(self):
         sum_of_cells = 0
+        has_empty = False
 
         for cell in self.cells:
             if cell.value != None:
@@ -50,13 +51,13 @@ class Cage:
             elif self.target_sum <= sum_of_cells:
                 return False
             
-            #* cage is not full and below sum amount
-            else: return True
+            #* mark cage as incomplete and keep checking all cells
+            has_empty = True
 
-        if self.target_sum == sum_of_cells:
-            return True
-        
-        #* cage if full and not sum amount
-        else: return False 
+        if has_empty:
+            return sum_of_cells < self.target_sum
+
+        #* full cage must exactly match target
+        return self.target_sum == sum_of_cells
 
 
