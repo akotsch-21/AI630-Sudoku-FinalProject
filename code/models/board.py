@@ -151,5 +151,21 @@ class Board:
                 return cage.is_valid()
         
         return True
+
+    def is_solved(self) -> bool:
+        """
+        Check whether the board is completely filled and valid.
+        """
+        for row in self.cells:
+            for cell in row:
+                if cell is None or cell.value is None:
+                    return False
+
+        for row in self.cells:
+            for cell in row:
+                if not self.is_valid(cell):
+                    return False
+
+        return True
         
         
