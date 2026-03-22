@@ -8,6 +8,7 @@ from typing import Literal
 from rich.table import Table
 from rich.style import Style
 from rich.text import Text
+from rich import box
 from rich.console import Console, ConsoleOptions, RenderResult
 import randomcolor
 import duckdb
@@ -17,7 +18,6 @@ class Board:
     """
     Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
     """
-    MAX_LEN = 81
 
     # Get the parquet file path with:
     # curl -X GET \
@@ -51,9 +51,6 @@ class Board:
         # Create randomly pleasing colors for the cages
         # @see https://github.com/kevinwuhoo/randomcolor-py/blob/4b05e3aa2bbf6cd387d3c24e2a37fffd241a6cdb/randomcolor/__init__.py#L103
         cage_colors = randomcolor.RandomColor().generate(count=num_cages, format_="rgb Array")
-
-        if len(layout) != cls.MAX_LEN:
-            raise ValueError(f"Invalid puzzle string: {puzzle_string}")
 
         board = Board(difficulty=difficulty)
 
@@ -114,24 +111,59 @@ class Board:
         Get a string representation of the board, showing the current values of the cells.
 
         Arguments:
-            current_pos -- The current position of the solver, used to highlight the cell being processed.
+            current_pos -- The current position used to highlight the cell being processed.
         """
 
-        table = Table(title="Killer Sudoku", title_justify="center", min_width=80, show_header=False, box=None, padding=(0, 0))
+        main_table = Table(
+            title="Killer Sudoku",
+            title_justify="center",
+            expand=True,
+            show_header=False,
+            show_footer=False,
+            box=box.SQUARE,
+            padding=(0, 0),
+            pad_edge=False
+        )
 
-        for r in self.cells:
-            row_values = []
-            for c in r:
-                val = str(c.value) if c.value is not None else "."
-                if c.cage is not None:
-                    style = Style(bgcolor=c.cage.color)
-                else:
-                    style = Style()
-                if (c.row, c.col) == current_pos:
-                    style.color = "cyan"
-                row_values.append(Text(val, style=style, justify="center"))
-            table.add_row(*row_values)
-        return table
+        # 3x block rows, top, middle and bottom
+        for block_row in range(3):
+            block_row_tables = []
+
+            # 3x block columns, left, right and middle
+            for block_col in range(3):
+                block_table = Table(show_header=False, show_footer=False,expand=True, padding=(0, 0), box=box.HORIZONTALS, pad_edge=False)
+
+                # row within the block
+                for r in range(3):
+                    row_values = []
+                    for c in range(3):
+                        cell_row = block_row * 3 + r
+                        cell_col = block_col * 3 + c
+                        cell = self.cells[cell_row][cell_col]
+
+                        val = str(cell.value) if cell.value is not None else "."
+
+                        # Only cells with cages get background colors to identify cage.
+                        if cell.cage is not None:
+                            style = Style(bgcolor=cell.cage.color)
+                        else:
+                            style = Style()
+
+                        # Highlight the current cell being processed
+                        if (cell_row, cell_col) == current_pos:
+                            style.color = "cyan"
+                            style.bold = True
+                            style.underline = True
+
+                        row_values.append(Text(val, style=style, justify="center"))
+                    block_table.add_row(*row_values)
+
+                block_row_tables.append(block_table)
+
+            # Add the 3 blocks in this row to the main table
+            main_table.add_row(*block_row_tables)
+
+        return main_table
 
     def __rich_console__(self, _, __) -> RenderResult:
         yield self.generate_table()

@@ -1,9 +1,9 @@
 """
 Cage module defines the Cage class.
 """
-
-from rich.color import Color
 from typing import TYPE_CHECKING
+from rich.color import Color
+
 
 if TYPE_CHECKING:
     from cell import Cell
