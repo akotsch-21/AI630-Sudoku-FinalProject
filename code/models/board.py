@@ -5,6 +5,11 @@ This modules defines the Board class, which represents a Killer Sudoku board.
 from models.cage import Cage
 from models.cell import Cell
 from typing import Literal
+from rich.table import Table
+from rich.style import Style
+from rich.text import Text
+from rich.console import Console, ConsoleOptions, RenderResult
+import randomcolor
 import duckdb
 
 
@@ -34,15 +39,18 @@ class Board:
 
         # Download a random row from hugging face using DuckDB's parquet reader.
         query = f"""
-            SELECT puzzle_string, difficulty
+            SELECT puzzle_string, difficulty, num_cages
             FROM "{cls.PUZZLE_PARQUET}"
             {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
             ORDER BY RANDOM()
             LIMIT 1
         """
 
-        puzzle_string, difficulty = duckdb.query(query).fetchone()
+        puzzle_string, difficulty, num_cages = duckdb.query(query).fetchone()
         layout, sums_part = puzzle_string.split("\n", 1)
+        # Create randomly pleasing colors for the cages
+        # @see https://github.com/kevinwuhoo/randomcolor-py/blob/4b05e3aa2bbf6cd387d3c24e2a37fffd241a6cdb/randomcolor/__init__.py#L103
+        cage_colors = randomcolor.RandomColor().generate(count=num_cages, format_="rgb Array")
 
         if len(layout) != cls.MAX_LEN:
             raise ValueError(f"Invalid puzzle string: {puzzle_string}")
@@ -51,7 +59,7 @@ class Board:
 
         for entry in sums_part.split(";"):
             cage_id, target_sum = entry.split(":")
-            cage = Cage(cage_id, int(target_sum))
+            cage = Cage(cage_id, int(target_sum), cage_colors.pop())
             board.add_cage(cage)
 
         for i, cage_id in enumerate(layout):
@@ -100,6 +108,33 @@ class Board:
         for cage in self.cages.values():
             for cell in cage.cells:
                 self.cells[cell.row][cell.col] = cell
+
+    def generate_table(self, current_pos: tuple[int, int] | None = None) -> Table:
+        """
+        Get a string representation of the board, showing the current values of the cells.
+
+        Arguments:
+            current_pos -- The current position of the solver, used to highlight the cell being processed.
+        """
+
+        table = Table(title="Killer Sudoku", title_justify="center", min_width=80, show_header=False, box=None, padding=(0, 0))
+
+        for r in self.cells:
+            row_values = []
+            for c in r:
+                val = str(c.value) if c.value is not None else "."
+                if c.cage is not None:
+                    style = Style(bgcolor=c.cage.color)
+                else:
+                    style = Style()
+                if (c.row, c.col) == current_pos:
+                    style.color = "cyan"
+                row_values.append(Text(val, style=style, justify="center"))
+            table.add_row(*row_values)
+        return table
+
+    def __rich_console__(self, _, __) -> RenderResult:
+        yield self.generate_table()
 
     def __str__(self):
         result = f"Board(difficulty={self.difficulty})\n"
