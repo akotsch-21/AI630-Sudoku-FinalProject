@@ -151,9 +151,7 @@ class Board:
 
                         # Highlight the current cell being processed
                         if (cell_row, cell_col) == current_pos:
-                            style.color = "cyan"
-                            style.bold = True
-                            style.underline = True
+                            style = Style.combine([style, Style(color="cyan", bold=True, underline2=True)])
 
                         row_values.append(Text(val, style=style, justify="center"))
                     block_table.add_row(*row_values)
