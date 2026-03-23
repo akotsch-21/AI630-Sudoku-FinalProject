@@ -5,6 +5,12 @@ This modules defines the Board class, which represents a Killer Sudoku board.
 from models.cage import Cage
 from models.cell import Cell
 from typing import Literal
+from rich.table import Table
+from rich.style import Style
+from rich.text import Text
+from rich import box
+from rich.console import Console, ConsoleOptions, RenderResult
+import randomcolor
 import duckdb
 
 
@@ -12,7 +18,6 @@ class Board:
     """
     Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
     """
-    MAX_LEN = 81
 
     # Get the parquet file path with:
     # curl -X GET \
@@ -34,24 +39,24 @@ class Board:
 
         # Download a random row from hugging face using DuckDB's parquet reader.
         query = f"""
-            SELECT puzzle_string, difficulty
+            SELECT puzzle_string, difficulty, num_cages
             FROM "{cls.PUZZLE_PARQUET}"
             {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
             ORDER BY RANDOM()
             LIMIT 1
         """
 
-        puzzle_string, difficulty = duckdb.query(query).fetchone()
+        puzzle_string, difficulty, num_cages = duckdb.query(query).fetchone()
         layout, sums_part = puzzle_string.split("\n", 1)
-
-        if len(layout) != cls.MAX_LEN:
-            raise ValueError(f"Invalid puzzle string: {puzzle_string}")
+        # Create randomly pleasing colors for the cages
+        # @see https://github.com/kevinwuhoo/randomcolor-py/blob/4b05e3aa2bbf6cd387d3c24e2a37fffd241a6cdb/randomcolor/__init__.py#L103
+        cage_colors = randomcolor.RandomColor().generate(count=num_cages, format_="rgb Array")
 
         board = Board(difficulty=difficulty)
 
         for entry in sums_part.split(";"):
             cage_id, target_sum = entry.split(":")
-            cage = Cage(cage_id, int(target_sum))
+            cage = Cage(cage_id, int(target_sum), cage_colors.pop())
             board.add_cage(cage)
 
         for i, cage_id in enumerate(layout):
@@ -100,6 +105,66 @@ class Board:
         for cage in self.cages.values():
             for cell in cage.cells:
                 self.cells[cell.row][cell.col] = cell
+
+    def generate_table(self, current_pos: tuple[int, int] | None = None) -> Table:
+        """
+        Get a string representation of the board, showing the current values of the cells.
+
+        Arguments:
+            current_pos -- The current position used to highlight the cell being processed.
+        """
+
+        main_table = Table(
+            title="Killer Sudoku",
+            title_justify="center",
+            expand=True,
+            show_header=False,
+            show_footer=False,
+            box=box.SQUARE,
+            padding=(0, 0),
+            pad_edge=False
+        )
+
+        # 3x block rows, top, middle and bottom
+        for block_row in range(3):
+            block_row_tables = []
+
+            # 3x block columns, left, right and middle
+            for block_col in range(3):
+                block_table = Table(show_header=False, show_footer=False,expand=True, padding=(0, 0), box=box.HORIZONTALS, pad_edge=False)
+
+                # row within the block
+                for r in range(3):
+                    row_values = []
+                    for c in range(3):
+                        cell_row = block_row * 3 + r
+                        cell_col = block_col * 3 + c
+                        cell = self.cells[cell_row][cell_col]
+
+                        val = str(cell.value) if cell.value is not None else "."
+
+                        # Only cells with cages get background colors to identify cage.
+                        if cell.cage is not None:
+                            style = Style(bgcolor=cell.cage.color)
+                        else:
+                            style = Style()
+
+                        # Highlight the current cell being processed
+                        if (cell_row, cell_col) == current_pos:
+                            style = Style.combine([style, Style(color="cyan", bold=True, underline2=True)])
+
+                        row_values.append(Text(val, style=style, justify="center"))
+                    block_table.add_row(*row_values)
+
+                block_row_tables.append(block_table)
+
+            # Add the 3 blocks in this row to the main table
+            main_table.add_row(*block_row_tables)
+
+        return main_table
+
+    def __rich_console__(self, _, __) -> RenderResult:
+        yield self.generate_table()
 
     def __str__(self):
         result = f"Board(difficulty={self.difficulty})\n"
