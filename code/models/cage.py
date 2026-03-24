@@ -1,8 +1,10 @@
 """
 Cage module defines the Cage class.
 """
+from itertools import combinations
 from typing import TYPE_CHECKING
 from rich.color import Color
+
 
 
 if TYPE_CHECKING:
@@ -27,6 +29,8 @@ class Cage:
         self.target_sum = target_sum
         self.cells = []
         self.__color = Color.from_rgb(*rgb_color)
+        self.domains = [] # list[tuple[int]]
+
 
     @property
     def color(self) -> Color:
@@ -44,6 +48,17 @@ class Cage:
         """
         self.cells.append(cell)
 
+    def build_domains(self):
+        """
+        Build the domains for the cage based on the target sum and number of cells.
+        """
+        self.domains = []
+
+        # Domain is all possible combinations of numbers that can sum up to target_sum of cage.
+        for combo in combinations(range(1, 10), len(self.cells)):
+            if sum(combo) == self.target_sum:
+                self.domains.append(combo)
+
     def in_cage(self, c):
         for cell in self.cells:
             if c == cell: return True
@@ -56,11 +71,11 @@ class Cage:
         for cell in self.cells:
             if cell.value != None:
                 sum_of_cells += cell.value
-        
+
             #* check if cage is not full and is greater than sum amount
             elif self.target_sum <= sum_of_cells:
                 return False
-            
+
             #* mark cage as incomplete and keep checking all cells
             has_empty = True
 
@@ -69,5 +84,3 @@ class Cage:
 
         #* full cage must exactly match target
         return self.target_sum == sum_of_cells
-
-

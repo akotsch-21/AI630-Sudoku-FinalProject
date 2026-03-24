@@ -25,3 +25,18 @@ class Cell:
         self.col = col
         self.cage = cage
         self.value = None
+        self.domains = set(range(1, 10))
+
+    def __lt__(self, other: "Cell") -> bool:
+        if self.row == other.row:
+            return self.col < other.col
+        return self.row < other.row
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Cell):
+            return False
+
+        return self.row == other.row and self.col == other.col
+
+    def __hash__(self) -> int:
+        return hash((self.row, self.col))
