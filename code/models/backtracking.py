@@ -5,4 +5,5 @@ def backtracking(board, domain):
             print(i, j)
             board.cells[i][j].value = num
             print(board.is_valid(board.cells[i][j]))
+            print(f"Solved: {board.is_solved()}")
             print(board)

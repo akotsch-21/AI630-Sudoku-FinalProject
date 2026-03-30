@@ -223,40 +223,53 @@ class Board:
                     if other_neighbor != neighbor:
                         queue.append((other_neighbor, cell))
 
-    # def is_valid(self,cell):
-    #     """
-    #     check if board is in a valid state after input of cell
-    #     """
-    #     row = cell.row
-    #     col = cell.col
-    #     val = cell.value
+    def is_valid(self, cell: Cell) -> bool:
+        """
+        Check if a single cell assignment is valid under Sudoku and cage rules.
+        """
+        row = cell.row
+        col = cell.col
+        val = cell.value
 
-    #     box = ((row//3)*3, (col//3)*3)
+        if val is None:
+            return True
 
-    #     #* check row and collumn for repeat values
-    #     for i in range(9):
-    #         if self.cells[row][i].value == val and col != i:
-    #             print("column")
-    #             return False
-    #         if self.cells[i][col].value == val and row != i:
-    #             print("row")
-    #             return False
+        # Row and column uniqueness.
+        for i in range(9):
+            if i != col and self.cells[row][i].value == val:
+                return False
+            if i != row and self.cells[i][col].value == val:
+                return False
 
-    #     #* check box
-    #     for i in range(box[0],box[0]+3):
-    #         for j in range(box[1], box[1]+3):
-    #             if self.cells[i][j].value == val and row != i and col != j:
-    #                 print("box")
-    #                 return False
+        # 3x3 subgrid uniqueness.
+        box_row_start = (row // 3) * 3
+        box_col_start = (col // 3) * 3
+        for i in range(box_row_start, box_row_start + 3):
+            for j in range(box_col_start, box_col_start + 3):
+                if (i != row or j != col) and self.cells[i][j].value == val:
+                    return False
 
+        # Cage sum validity.
+        if cell.cage is not None:
+            return cell.cage.is_valid()
 
-    #     #* check cages
-    #     for cage in self.cages.values():
-    #         if cage.in_cage(cell):
-    #             print("cage")
-    #             return cage.is_valid()
+        return True
 
-    #     return True
+    def is_solved(self) -> bool:
+        """
+        Check whether the board is completely filled and valid.
+        """
+        for row in self.cells:
+            for cell in row:
+                if cell is None or cell.value is None:
+                    return False
+
+        for row in self.cells:
+            for cell in row:
+                if not self.is_valid(cell):
+                    return False
+
+        return True
 
     def _revise(self, cell: Cell, neighbor: Cell) -> bool:
         """
