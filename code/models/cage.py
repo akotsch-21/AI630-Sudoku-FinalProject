@@ -44,15 +44,15 @@ class Cage:
         has_empty = False
 
         for cell in self.cells:
-            if cell.value != None:
+            if cell.value is not None:
                 sum_of_cells += cell.value
-        
-            #* check if cage is not full and is greater than sum amount
-            elif self.target_sum <= sum_of_cells:
-                return False
-            
-            #* mark cage as incomplete and keep checking all cells
-            has_empty = True
+            else:
+                #* check if cage is not full and is greater than sum amount
+                if self.target_sum <= sum_of_cells:
+                    return False
+
+                #* mark cage as incomplete and keep checking all cells
+                has_empty = True
 
         if has_empty:
             return sum_of_cells < self.target_sum
