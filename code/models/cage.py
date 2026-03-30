@@ -1,8 +1,11 @@
 """
 Cage module defines the Cage class.
 """
-
+from itertools import combinations
 from typing import TYPE_CHECKING
+from rich.color import Color
+
+
 
 if TYPE_CHECKING:
     from cell import Cell
@@ -13,17 +16,28 @@ class Cage:
     This means that the cells in cage must sum to specific target_sum.
     """
 
-    def __init__(self, cage_id: str, target_sum: int):
+    def __init__(self, cage_id: str, target_sum: int, rgb_color: list[int]) -> None:
         """
         Initialize a Cage instance.
 
         Arguments:
             cage_id -- A unique identifier for the cage.
             target_sum -- The sum that the values in the cage must add up to.
+            rgb_color -- The RGB color to use when displaying the cage.
         """
         self.cage_id = cage_id
         self.target_sum = target_sum
         self.cells = []
+        self.__color = Color.from_rgb(*rgb_color)
+        self.domains = [] # list[tuple[int]]
+
+
+    @property
+    def color(self) -> Color:
+        """
+        The color of the cage, used for display purposes.
+        """
+        return self.__color
 
     def add_cell(self, cell: "Cell") -> None:
         """
@@ -33,6 +47,17 @@ class Cage:
             cell -- The cell to add to the cage.
         """
         self.cells.append(cell)
+
+    def build_domains(self):
+        """
+        Build the domains for the cage based on the target sum and number of cells.
+        """
+        self.domains = []
+
+        # Domain is all possible combinations of numbers that can sum up to target_sum of cage.
+        for combo in combinations(range(1, 10), len(self.cells)):
+            if sum(combo) == self.target_sum:
+                self.domains.append(combo)
 
     def in_cage(self, c):
         for cell in self.cells:
@@ -59,5 +84,3 @@ class Cage:
 
         #* full cage must exactly match target
         return self.target_sum == sum_of_cells
-
-
