@@ -4,6 +4,7 @@ This modules defines the Board class, which represents a Killer Sudoku board.
 
 from models.cage import Cage
 from models.cell import Cell
+from models.dataset import ensure_local_parquet
 from typing import Literal
 from rich.table import Table
 from rich.style import Style
@@ -19,11 +20,6 @@ class Board:
     """
     Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
     """
-
-    # Get the parquet file path with:
-    # curl -X GET \
-    #  "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train"
-    PUZZLE_PARQUET = "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train/0.parquet"
 
     def __init__(self, difficulty: Literal[2, 3, 4]):
         self.difficulty = difficulty
@@ -129,24 +125,49 @@ class Board:
             Board: A Board object representing the loaded puzzle.
         """
 
-        # Download a random row from hugging face using DuckDB's parquet reader.
+        parquet_source = ensure_local_parquet()
+
+        # Query a random row from the local parquet cache 
+        # (was having some issues when training so just download it the full dataset and do it locally now).
         query = f"""
             SELECT puzzle_string, difficulty, num_cages
-            FROM "{cls.PUZZLE_PARQUET}"
+            FROM "{parquet_source}"
             {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
             ORDER BY RANDOM()
             LIMIT 1
         """
 
         puzzle_string, difficulty, num_cages = duckdb.query(query).fetchone()
+        return cls.from_puzzle_string(puzzle_string, difficulty=difficulty, num_cages=num_cages)
+
+    @classmethod
+    def from_puzzle_string(
+        cls,
+        puzzle_string: str,
+        difficulty: int,
+        num_cages: int | None = None,
+    ) -> "Board":
+        """
+        Construct a board directly from a puzzle string.
+
+        Arguments:
+            puzzle_string -- Board layout and cage sums in the dataset format.
+            difficulty -- Difficulty to assign to this board.
+
+        Returns:
+            Board: A populated board instance.
+        """
         layout, sums_part = puzzle_string.split("\n", 1)
+        cage_entries = [entry for entry in sums_part.split(";") if entry]
+
         # Create randomly pleasing colors for the cages
         # @see https://github.com/kevinwuhoo/randomcolor-py/blob/4b05e3aa2bbf6cd387d3c24e2a37fffd241a6cdb/randomcolor/__init__.py#L103
-        cage_colors = randomcolor.RandomColor().generate(count=num_cages, format_="rgb Array")
+        cage_count = int(num_cages) if num_cages is not None else len(cage_entries)
+        cage_colors = randomcolor.RandomColor().generate(count=cage_count, format_="rgb Array")
 
         board = Board(difficulty=difficulty)
 
-        for entry in sums_part.split(";"):
+        for entry in cage_entries:
             cage_id, target_sum = entry.split(":")
             cage = Cage(cage_id, int(target_sum), cage_colors.pop())
             board.add_cage(cage)
