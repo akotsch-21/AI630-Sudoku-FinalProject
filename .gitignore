@@ -1,6 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,macos,windows,emacs,linux,archlinuxpackages
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,visualstudiocode,macos,windows,emacs,linux,archlinuxpackages
 
+data/killer_sudoku_train.parquet
+
 ### ArchLinuxPackages ###
 *.tar
 *.tar.*
