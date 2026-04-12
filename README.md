@@ -24,3 +24,19 @@ We will build an AI Agent that will be able to play this more complex version of
    ```bash
    python code/main.py
    ```
+
+## ML Baseline (Tabular Features + MLP)
+The first `train` or `solve` run downloads and caches the parquet dataset to `data/killer_sudoku_train.parquet`.
+
+Train a simple candidate-ranking model:
+
+```bash
+python code/ml_main.py train
+```
+
+Use that model to guide backtracking on a random puzzle:
+
+```bash
+python code/ml_main.py solve
+```
+
