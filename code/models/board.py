@@ -4,6 +4,7 @@ This modules defines the Board class, which represents a Killer Sudoku board.
 
 from models.cage import Cage
 from models.cell import Cell
+from models.dataset import ensure_local_parquet
 from typing import Literal
 from rich.table import Table
 from rich.style import Style
@@ -19,11 +20,6 @@ class Board:
     """
     Represents a Killer Sudoku board, which consists of a 9x9 grid of cells and a collection of cages.
     """
-
-    # Get the parquet file path with:
-    # curl -X GET \
-    #  "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train"
-    PUZZLE_PARQUET = "https://huggingface.co/api/datasets/jackcai1206/killer-sudoku-puzzles/parquet/default/train/0.parquet"
 
     def __init__(self, difficulty: Literal[2, 3, 4]):
         self.difficulty = difficulty
@@ -129,24 +125,49 @@ class Board:
             Board: A Board object representing the loaded puzzle.
         """
 
-        # Download a random row from hugging face using DuckDB's parquet reader.
+        parquet_source = ensure_local_parquet()
+
+        # Query a random row from the local parquet cache 
+        # (was having some issues when training so just download it the full dataset and do it locally now).
         query = f"""
             SELECT puzzle_string, difficulty, num_cages
-            FROM "{cls.PUZZLE_PARQUET}"
+            FROM "{parquet_source}"
             {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
             ORDER BY RANDOM()
             LIMIT 1
         """
 
         puzzle_string, difficulty, num_cages = duckdb.query(query).fetchone()
+        return cls.from_puzzle_string(puzzle_string, difficulty=difficulty, num_cages=num_cages)
+
+    @classmethod
+    def from_puzzle_string(
+        cls,
+        puzzle_string: str,
+        difficulty: int,
+        num_cages: int | None = None,
+    ) -> "Board":
+        """
+        Construct a board directly from a puzzle string.
+
+        Arguments:
+            puzzle_string -- Board layout and cage sums in the dataset format.
+            difficulty -- Difficulty to assign to this board.
+
+        Returns:
+            Board: A populated board instance.
+        """
         layout, sums_part = puzzle_string.split("\n", 1)
+        cage_entries = [entry for entry in sums_part.split(";") if entry]
+
         # Create randomly pleasing colors for the cages
         # @see https://github.com/kevinwuhoo/randomcolor-py/blob/4b05e3aa2bbf6cd387d3c24e2a37fffd241a6cdb/randomcolor/__init__.py#L103
-        cage_colors = randomcolor.RandomColor().generate(count=num_cages, format_="rgb Array")
+        cage_count = int(num_cages) if num_cages is not None else len(cage_entries)
+        cage_colors = randomcolor.RandomColor().generate(count=cage_count, format_="rgb Array")
 
         board = Board(difficulty=difficulty)
 
-        for entry in sums_part.split(";"):
+        for entry in cage_entries:
             cage_id, target_sum = entry.split(":")
             cage = Cage(cage_id, int(target_sum), cage_colors.pop())
             board.add_cage(cage)
@@ -223,52 +244,106 @@ class Board:
                     if other_neighbor != neighbor:
                         queue.append((other_neighbor, cell))
 
-    def is_valid(self, cell: Cell) -> bool:
+    def iter_cells(self) -> list[Cell]:
         """
-        Check if a single cell assignment is valid under Sudoku and cage rules.
+        Return all board cells in row-major order.
         """
-        row = cell.row
-        col = cell.col
-        val = cell.value
-
-        if val is None:
-            return True
-
-        # Row and column uniqueness.
-        for i in range(9):
-            if i != col and self.cells[row][i].value == val:
-                return False
-            if i != row and self.cells[i][col].value == val:
-                return False
-
-        # 3x3 subgrid uniqueness.
-        box_row_start = (row // 3) * 3
-        box_col_start = (col // 3) * 3
-        for i in range(box_row_start, box_row_start + 3):
-            for j in range(box_col_start, box_col_start + 3):
-                if (i != row or j != col) and self.cells[i][j].value == val:
-                    return False
-
-        # Cage sum validity.
-        if cell.cage is not None:
-            return cell.cage.is_valid()
-
-        return True
+        return [cell for row in self.cells for cell in row]
 
     def is_solved(self) -> bool:
         """
-        Check whether the board is completely filled and valid.
+        Return True when every cell is assigned.
         """
-        for row in self.cells:
-            for cell in row:
-                if cell is None or cell.value is None:
+        return all(cell.value is not None for cell in self.iter_cells())
+
+    def select_unassigned_cell(self) -> Cell | None:
+        """
+        Select an unassigned cell using a minimum remaining values heuristic.
+        """
+        unassigned = [cell for cell in self.iter_cells() if cell.value is None]
+        if not unassigned:
+            return None
+        return min(unassigned, key=lambda cell: (len(cell.domains), cell.row, cell.col))
+
+    def is_valid(self, cell: Cell, value: int | None = None) -> bool:
+        """
+        Check whether assigning a value to a cell is consistent with board constraints.
+        If value is omitted, the cell's current value is validated.
+        """
+        if value is None:
+            if cell.value is None:
+                return True
+            value = cell.value
+
+        # Row/column/box/cage all-different is encoded by peers in arcs.
+        for peer in self.arcs.get(cell, set()):
+            if peer.value == value and peer != cell:
+                return False
+
+        cage = cell.cage
+        if cage is None:
+            return True
+
+        assigned_values = []
+        for cage_cell in cage.cells:
+            if cage_cell == cell:
+                continue
+
+            if cage_cell.value is not None:
+                if cage_cell.value == value:
+                    return False
+                assigned_values.append(cage_cell.value)
+
+        current_sum = sum(assigned_values) + value
+        remaining_slots = sum(1 for cage_cell in cage.cells if cage_cell != cell and cage_cell.value is None)
+
+        if current_sum > cage.target_sum:
+            return False
+
+        if remaining_slots == 0:
+            return current_sum == cage.target_sum
+
+        used_digits = set(assigned_values)
+        used_digits.add(value)
+        available_digits = sorted(digit for digit in range(1, 10) if digit not in used_digits)
+
+        if len(available_digits) < remaining_slots:
+            return False
+
+        min_remaining_sum = sum(available_digits[:remaining_slots])
+        max_remaining_sum = sum(available_digits[-remaining_slots:])
+        remaining_sum_needed = cage.target_sum - current_sum
+        return min_remaining_sum <= remaining_sum_needed <= max_remaining_sum
+
+    def propagate_constraints(self) -> bool:
+        """
+        Recompute domains from the current partial assignment until a fixed point.
+        Returns False if any domain becomes empty or a contradiction is found.
+        """
+        changed = True
+
+        while changed:
+            changed = False
+            for cell in self.iter_cells():
+                if cell.value is not None:
+                    if not self.is_valid(cell):
+                        return False
+                    cell.domains = {cell.value}
+                    continue
+
+                valid_domain = {candidate for candidate in cell.domains if self.is_valid(cell, candidate)}
+                if not valid_domain:
                     return False
 
-        for row in self.cells:
-            for cell in row:
-                if not self.is_valid(cell):
-                    return False
+                if valid_domain != cell.domains:
+                    cell.domains = valid_domain
+                    changed = True
 
+                if len(cell.domains) == 1 and cell.value is None:
+                    cell.value = next(iter(cell.domains))
+                    changed = True
+
+        self.solved = self.is_solved()
         return True
 
     def _revise(self, cell: Cell, neighbor: Cell) -> bool:
