@@ -25,6 +25,11 @@ We will build an AI Agent that will be able to play this more complex version of
    python code/main.py
    ```
 
+### Benchmarking
+To run benchmarks: `DIFFICULTY=3 python/code/benchmark.py`. This will output a CSV in the `tmp/` directory as well.
+
+If `DIFFICULTY` environment variable is not passed, difficulty will be assumed to be 3.
+
 ## ML Baseline (Tabular Features + MLP)
 The first `train` or `solve` run downloads and caches the parquet dataset to `data/killer_sudoku_train.parquet`.
 
@@ -39,4 +44,3 @@ Use that model to guide backtracking on a random puzzle:
 ```bash
 python code/ml_main.py solve
 ```
-
