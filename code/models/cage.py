@@ -63,7 +63,13 @@ class Cage:
         for cell in self.cells:
             if c == cell: return True
         return False
-
+    
+    def getDomain(self) -> set:
+        domain = set()
+        for d in self.domains:
+            domain = domain.union(set(d))
+        return domain
+        
     def is_valid(self):
         sum_of_cells = 0
         has_empty = False

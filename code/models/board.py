@@ -14,7 +14,8 @@ from rich.console import RenderResult
 import randomcolor
 import duckdb
 from collections import deque
-
+from copy import deepcopy
+ 
 
 class Board:
     """
@@ -26,12 +27,13 @@ class Board:
         self.cells = [[None for _ in range(9)] for _ in range(9)]
         self.cages = {} # cage_id: Cage
         self.arcs = {} # cell: set[neighboring cells]
+        self.backtrack_calls = 0
         self.solved = False
         self.current_cell = None # Used for highlighting current cell being processed by UI
 
     def __rich_console__(self, _, __) -> RenderResult:
         main_table = Table(
-            title="Killer Sudoku",
+            title=f"Killer Sudoku: Difficulty {self.difficulty}, Needed Backtrack Calls: {self.backtrack_calls}",
             title_justify="center",
             expand=True,
             show_header=False,
@@ -130,15 +132,15 @@ class Board:
         # Query a random row from the local parquet cache 
         # (was having some issues when training so just download it the full dataset and do it locally now).
         query = f"""
-            SELECT puzzle_string, difficulty, num_cages
+            SELECT puzzle_string, difficulty, num_cages,backtrack_calls
             FROM "{parquet_source}"
             {f"WHERE difficulty = {difficulty}" if difficulty is not None else ""}
             ORDER BY RANDOM()
             LIMIT 1
         """
 
-        puzzle_string, difficulty, num_cages = duckdb.query(query).fetchone()
-        return cls.from_puzzle_string(puzzle_string, difficulty=difficulty, num_cages=num_cages)
+        puzzle_string, difficulty, num_cages,backtrack_calls = duckdb.query(query).fetchone()
+        return cls.from_puzzle_string(puzzle_string, difficulty=difficulty, num_cages=num_cages, backtrack_calls=backtrack_calls)
 
     @classmethod
     def from_puzzle_string(
@@ -146,6 +148,7 @@ class Board:
         puzzle_string: str,
         difficulty: int,
         num_cages: int | None = None,
+        backtrack_calls: int | None = None
     ) -> "Board":
         """
         Construct a board directly from a puzzle string.
@@ -166,6 +169,7 @@ class Board:
         cage_colors = randomcolor.RandomColor().generate(count=cage_count, format_="rgb Array")
 
         board = Board(difficulty=difficulty)
+        board.backtrack_calls = int(backtrack_calls) if backtrack_calls is not None else 0
 
         for entry in cage_entries:
             cage_id, target_sum = entry.split(":")
@@ -219,12 +223,12 @@ class Board:
 
         self.arcs =self._build_arcs()
 
-    def revise_arcs(self) -> None:
+    def revise_arcs(self) -> int:
         """
         Revise the board arcs.
         """
         queue = deque()
-
+        count = 0
         # Add all arcs to queue. (cell: neighbor)
         for cell, neighbors in self.arcs.items():
             for neighbor in neighbors:
@@ -243,6 +247,9 @@ class Board:
                 for other_neighbor in self.arcs[cell]:
                     if other_neighbor != neighbor:
                         queue.append((other_neighbor, cell))
+                count+=1
+        return count
+                
 
     def iter_cells(self) -> list[Cell]:
         """
@@ -263,8 +270,20 @@ class Board:
         unassigned = [cell for cell in self.iter_cells() if cell.value is None]
         if not unassigned:
             return None
-        return min(unassigned, key=lambda cell: (len(cell.domains), cell.row, cell.col))
-
+        return min(unassigned, key=lambda cell: (len(cell.domains.intersection(cell.cage.getDomain())), cell.row, cell.col))
+    
+    def findLCS(self,cell):
+        lcs = []
+        r = cell.row
+        c = cell.col
+        for val in cell.domains.intersection(cell.cage.getDomain()):
+            lcsBoard= deepcopy(self)
+            lcsBoard.cells[r][c].value = val
+            lcs.append([lcsBoard.revise_arcs(),val])
+        
+        
+        return lcs
+        
     def is_valid(self, cell: Cell, value: int | None = None) -> bool:
         """
         Check whether assigning a value to a cell is consistent with board constraints.
