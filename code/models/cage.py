@@ -58,18 +58,19 @@ class Cage:
         for combo in combinations(range(1, 10), len(self.cells)):
             if sum(combo) == self.target_sum:
                 self.domains.append(combo)
+    reset = build_domains # Alias, reset just rebuilds the domains for the cage
 
     def in_cage(self, c):
         for cell in self.cells:
             if c == cell: return True
         return False
-    
+
     def getDomain(self) -> set:
         domain = set()
         for d in self.domains:
             domain = domain.union(set(d))
         return domain
-        
+
     def is_valid(self):
         sum_of_cells = 0
         has_empty = False

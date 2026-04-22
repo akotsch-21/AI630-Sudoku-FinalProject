@@ -15,7 +15,7 @@ import randomcolor
 import duckdb
 from collections import deque
 from copy import deepcopy
- 
+
 
 class Board:
     """
@@ -129,7 +129,7 @@ class Board:
 
         parquet_source = ensure_local_parquet()
 
-        # Query a random row from the local parquet cache 
+        # Query a random row from the local parquet cache
         # (was having some issues when training so just download it the full dataset and do it locally now).
         query = f"""
             SELECT puzzle_string, difficulty, num_cages,backtrack_calls
@@ -249,7 +249,19 @@ class Board:
                         queue.append((other_neighbor, cell))
                 count+=1
         return count
-                
+
+    def reset(self):
+        """
+        Reset the board to its initial state by clearing all cell values and domains.
+        """
+        for row in self.cells:
+            for cell in row:
+                cell.reset()
+        for cage in self.cages.values():
+            cage.reset()
+        self.arcs = self._build_arcs()
+        self.solved = False
+        self.current_cell = None
 
     def iter_cells(self) -> list[Cell]:
         """
@@ -271,7 +283,7 @@ class Board:
         if not unassigned:
             return None
         return min(unassigned, key=lambda cell: (len(cell.domains.intersection(cell.cage.getDomain())), cell.row, cell.col))
-    
+
     def findLCS(self,cell):
         lcs = []
         r = cell.row
@@ -280,10 +292,10 @@ class Board:
             lcsBoard= deepcopy(self)
             lcsBoard.cells[r][c].value = val
             lcs.append([lcsBoard.revise_arcs(),val])
-        
-        
+
+
         return lcs
-        
+
     def is_valid(self, cell: Cell, value: int | None = None) -> bool:
         """
         Check whether assigning a value to a cell is consistent with board constraints.

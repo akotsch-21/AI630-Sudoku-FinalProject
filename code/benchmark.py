@@ -40,6 +40,7 @@ def benchmark_backtracking(boards: list[Board]) -> list[float]:
         backtracking(board, 0,0,0)
         end = time.time()
         times.append(end - start)
+        board.reset()
     return times
 
 def benchmark_backtracking_modified(boards: list[Board]) -> tuple[list[float], list[int]]:
@@ -63,6 +64,8 @@ def benchmark_backtracking_modified(boards: list[Board]) -> tuple[list[float], l
         end = time.time()
         backtracks.append(required_backtracks - backtracks_count)
         times.append(end - start)
+        board.reset()
+
     return times, backtracks
 
 def benchmark_backtracking_ml(boards: list[Board]) -> list[float]:
@@ -82,6 +85,7 @@ def benchmark_backtracking_ml(boards: list[Board]) -> list[float]:
         solve_with_model(board, model=model)
         end = time.time()
         times.append(end - start)
+        board.reset()
     return times
 
 

@@ -40,3 +40,10 @@ class Cell:
 
     def __hash__(self) -> int:
         return hash((self.row, self.col))
+
+    def reset(self):
+        """
+        Reset the cell's value and domains.
+        """
+        self.value = None
+        self.domains = set(range(1, 10))
